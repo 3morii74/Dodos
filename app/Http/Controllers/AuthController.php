@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Controllers\Api\V1;
+namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\SignupRequest;
@@ -10,9 +10,10 @@ use App\Http\Requests\VerifyResetCodeRequest;
 use App\Http\Requests\ResetPasswordRequest;
 use App\Models\User;
 use Illuminate\Support\Facades\Mail;
-use App\Mail\ResetPasswordMail;
+use App\Services\ResetPasswordMail;
 use Illuminate\Support\Str;
 use Tymon\JWTAuth\Facades\JWTAuth;
+use App\Exceptions\ApiError;
 
 class AuthController extends Controller
 {
@@ -61,7 +62,16 @@ class AuthController extends Controller
             'password_reset_verified' => false,
         ]);
 
-        Mail::to($user->email)->send(new ResetPasswordMail($user->name, $resetCode));
+        try {
+            Mail::to($user->email)->send(new ResetPasswordMail($user->name, $resetCode));
+        } catch (\Exception $e) {
+            $user->update([
+                'password_reset_code' => null,
+                'password_reset_expires' => null,
+                'password_reset_verified' => false,
+            ]);
+            throw new ApiError('There is an error in sending email', 500);
+        }
 
         return response()->json(['message' => 'Reset code sent to email']);
     }
@@ -71,8 +81,8 @@ class AuthController extends Controller
         $hashedResetCode = hash('sha256', $request->resetCode);
 
         $user = User::where('password_reset_code', $hashedResetCode)
-                    ->where('password_reset_expires', '>', now())
-                    ->first();
+            ->where('password_reset_expires', '>', now())
+            ->first();
 
         if (!$user) {
             return response()->json(['error' => 'Reset code invalid or expired'], 400);
@@ -86,8 +96,8 @@ class AuthController extends Controller
     public function resetPassword(ResetPasswordRequest $request)
     {
         $user = User::where('email', $request->email)
-                    ->where('password_reset_verified', true)
-                    ->first();
+            ->where('password_reset_verified', true)
+            ->first();
 
         if (!$user) {
             return response()->json(['error' => 'Reset code not verified or user not found'], 400);

@@ -1,7 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\Api\V1\AuthController;
+use App\Http\Controllers\AuthController;
 
 Route::prefix('v1/auth')->group(function () {
     Route::post('/signup', [AuthController::class, 'signup']);
